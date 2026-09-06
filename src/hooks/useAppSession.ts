@@ -31,8 +31,31 @@ const DEFAULT_STATE: AppState = {
   summary: null,
 };
 
+export interface UserProfile {
+  id: string; // Google 'sub' or other unique id
+  name?: string;
+  email?: string;
+  picture?: string;
+  token?: string; // id token
+}
+
+function decodeJwt(token: string): any {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = parts[1];
+    // Add padding if necessary
+    const padded = payload.padEnd(payload.length + (4 - (payload.length % 4)) % 4, "=");
+    const decoded = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decoded);
+  } catch (e) {
+    console.error("Failed to decode JWT", e);
+    return null;
+  }
+}
+
 export function useAppSession() {
-  const [user, setUser] = useState<string | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [history, setHistory] = useState<ExtendedHistoryItem[]>([]);
   const [currentState, setCurrentState] = useState<AppState>(DEFAULT_STATE);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,10 +63,18 @@ export function useAppSession() {
   // Load initial state from local storage on mount
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem("council_current_user");
-      if (storedUser) {
-        setUser(storedUser);
-        loadUserData(storedUser);
+      const stored = localStorage.getItem("council_current_user");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as UserProfile;
+          setUser(parsed);
+          if (parsed.email) loadUserData(parsed.email);
+          else loadUserData(parsed.id);
+        } catch (e) {
+          // Backwards compatibility: previously stored a plain username string
+          setUser({ id: stored });
+          loadUserData(stored);
+        }
       } else {
         setIsLoading(false);
       }
@@ -88,13 +119,43 @@ export function useAppSession() {
     }
   };
 
-  const login = (username: string) => {
-    localStorage.setItem("council_current_user", username);
-    setUser(username);
-    loadUserData(username);
+  // loginWithGoogle accepts an ID token (JWT) returned by Google's Identity Services
+  const loginWithGoogle = (idToken: string) => {
+    try {
+      const payload = decodeJwt(idToken);
+      if (!payload) {
+        console.error("Invalid ID token");
+        return;
+      }
+
+      const profile: UserProfile = {
+        id: payload.sub || payload.user_id || `${Date.now()}`,
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture,
+        token: idToken,
+      };
+
+      localStorage.setItem("council_current_user", JSON.stringify(profile));
+      setUser(profile);
+
+      const key = profile.email ?? profile.id;
+      loadUserData(key);
+    } catch (e) {
+      console.error("Failed to login with Google", e);
+    }
   };
 
   const logout = () => {
+    try {
+      if (user) {
+        const key = user.email ?? user.id;
+        // Optionally: clear stored app state for the user or keep it
+        // localStorage.removeItem(`council_app_state_${key}`);
+      }
+    } catch (e) {
+      // ignore
+    }
     localStorage.removeItem("council_current_user");
     setUser(null);
     setHistory([]);
@@ -112,7 +173,10 @@ export function useAppSession() {
         responses: preserveState ? prev.responses : null,
         summary: preserveState ? prev.summary : null,
       };
-      if (user) syncStateToStorage(user, nextState);
+      if (user) {
+        const key = user.email ?? user.id;
+        syncStateToStorage(key, nextState);
+      }
       return nextState;
     });
   }, [user]);
@@ -126,7 +190,10 @@ export function useAppSession() {
       if (nextPage === prev.page) return prev; // No back action
 
       const nextState = { ...prev, page: nextPage };
-      if (user) syncStateToStorage(user, nextState);
+      if (user) {
+        const key = user.email ?? user.id;
+        syncStateToStorage(key, nextState);
+      }
       return nextState;
     });
   }, [user]);
@@ -134,7 +201,10 @@ export function useAppSession() {
   const updateState = useCallback((updates: Partial<AppState>) => {
     setCurrentState((prev) => {
       const nextState = { ...prev, ...updates };
-      if (user) syncStateToStorage(user, nextState);
+      if (user) {
+        const key = user.email ?? user.id;
+        syncStateToStorage(key, nextState);
+      }
       return nextState;
     });
   }, [user]);
@@ -145,7 +215,8 @@ export function useAppSession() {
       const savedItem = { id: `${Date.now()}`, ...item };
       setHistory((prev) => {
         const newHistory = [savedItem, ...prev].slice(0, 50);
-        localStorage.setItem(`council_history_${user}`, JSON.stringify(newHistory));
+        const key = user.email ?? user.id;
+        localStorage.setItem(`council_history_${key}`, JSON.stringify(newHistory));
         return newHistory;
       });
     } catch (e) {
@@ -163,7 +234,10 @@ export function useAppSession() {
       summary: item.summary,
     };
     setCurrentState(nextState);
-    if (user) syncStateToStorage(user, nextState);
+    if (user) {
+      const key = user.email ?? user.id;
+      syncStateToStorage(key, nextState);
+    }
   }, [user]);
 
   return {
@@ -171,7 +245,8 @@ export function useAppSession() {
     history,
     currentState,
     isLoading,
-    login,
+    // kept for backward compatibility but now expects an ID token
+    loginWithGoogle,
     logout,
     navigate,
     goBack,
