@@ -129,44 +129,45 @@ function CouncilPage() {
 
       <main className="relative z-10 px-4 sm:px-8 pt-24 pb-16">
         <div className="max-w-7xl mx-auto">
-          <AnimatePresence mode="wait">
-            {page === "login" && (
-              <LoginPanel key="login" />
-            )}
+          // snippet around the AnimatePresence where LoginPanel was conditionally rendered
+// Replace the block that contained: {page === "login" && <LoginPanel key="login" />}
+// with only the query block (the rest of the file remains unchanged)
 
-            {page === "query" && (
-              <motion.section
-                key="hero"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -30 }}
-                transition={{ duration: 0.8 }}
-                className="text-center mt-12 sm:mt-24 mb-12"
-              >
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass mb-6"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                  <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary">
-                    Five Minds. One Council.
-                  </span>
-                </motion.div>
+<AnimatePresence mode="wait">
+  {/* Removed login panel render - app defaults to query view */}
+  {page === "query" && (
+    <motion.section
+      key="hero"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -30 }}
+      transition={{ duration: 0.8 }}
+      className="text-center mt-12 sm:mt-24 mb-12"
+    >
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass mb-6"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary">
+          Five Minds. One Council.
+        </span>
+      </motion.div>
 
-                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.05] mb-5">
-                  <span className="text-gradient">Convene the</span>
-                  <br />
-                  <span className="text-gradient-neon">AI Council</span>
-                </h1>
-                <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-                  Pose a question. Five expert intelligences deliberate in real time —
-                  then synthesize a unified, multi-perspective answer.
-                </p>
-              </motion.section>
-            )}
-          </AnimatePresence>
+      <h1 className="text-4xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.05] mb-5">
+        <span className="text-gradient">Convene the</span>
+        <br />
+        <span className="text-gradient-neon">AI Council</span>
+      </h1>
+      <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+        Pose a question. Five expert intelligences deliberate in real time —
+        then synthesize a unified, multi-perspective answer.
+      </p>
+    </motion.section>
+  )}
+</AnimatePresence>
 
           {page !== "login" && page !== "query" && query && (
             <motion.div
