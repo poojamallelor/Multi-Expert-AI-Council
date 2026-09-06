@@ -1,3 +1,4 @@
+// (Full file replacement — updated DEFAULT_STATE and added `login` wrapper)
 import { useState, useEffect, useCallback } from "react";
 import { type ExpertId, type DomainDetection } from "@/data/experts";
 
@@ -22,8 +23,9 @@ export interface AppState {
   summary: string[] | null;
 }
 
+// DEFAULT_STATE changed to start at "query" instead of "login"
 const DEFAULT_STATE: AppState = {
-  page: "login",
+  page: "query",
   query: "",
   detections: [],
   selectedDomains: [],
@@ -146,6 +148,35 @@ export function useAppSession() {
     }
   };
 
+  // New compatibility wrapper: `login` accepts either an ID token (JWT) or an email string.
+  // - If given a JWT, it calls loginWithGoogle(idToken)
+  // - If given a plain email, it creates a guest/local profile and proceeds
+  const login = (input: string) => {
+    if (!input) return;
+    // Heuristic: JWTs contain two dots (header.payload.signature)
+    const parts = input.split(".");
+    if (parts.length === 3) {
+      // Treat as ID token
+      loginWithGoogle(input);
+      return;
+    }
+
+    // Otherwise treat as an email/username fallback (legacy behavior)
+    try {
+      const profile: UserProfile = {
+        id: input,
+        email: input.includes("@") ? input : undefined,
+        name: input.includes("@") ? input.split("@")[0] : input,
+      };
+      localStorage.setItem("council_current_user", JSON.stringify(profile));
+      setUser(profile);
+      const key = profile.email ?? profile.id;
+      loadUserData(key);
+    } catch (e) {
+      console.error("Failed to perform fallback login", e);
+    }
+  };
+
   const logout = () => {
     try {
       if (user) {
@@ -159,7 +190,7 @@ export function useAppSession() {
     localStorage.removeItem("council_current_user");
     setUser(null);
     setHistory([]);
-    setCurrentState({ ...DEFAULT_STATE, page: "login" });
+    setCurrentState({ ...DEFAULT_STATE, page: "query" });
   };
 
   const navigate = useCallback((page: AppPage, preserveState: boolean = true) => {
@@ -245,6 +276,8 @@ export function useAppSession() {
     history,
     currentState,
     isLoading,
+    // compatibility: `login` accepts email or ID token (JWT)
+    login,
     // kept for backward compatibility but now expects an ID token
     loginWithGoogle,
     logout,
